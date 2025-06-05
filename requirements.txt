@@ -1,5 +1,4 @@
-flask
-openai
-google-generativeai
-python-dotenv
+python-telegram-bot
+nest-asyncio
+google-generativeia
 requests
