@@ -1,19 +1,36 @@
-# --- PASSO 1: INSTALAR A BIBLIOTECA (Execute esta célula separadamente ou esta linha primeiro) ---
-!pip install python-telegram-bot
+# --- PASSO 1: INSTALAR AS BIBLIOTECAS (APENAS SE ESTIVER NO COLAB OU AMBIENTE SIMILAR) ---
+# Se estiver no Render.com, estas linhas NÃO SÃO NECESSÁRIAS.
+# O Render.com usa o requirements.txt para instalar as dependências.
+# !pip install python-telegram-bot
+# !pip install nest-asyncio
+# !pip install google-generativeai
+# !pip install python-dotenv
 
 # --- PASSO 2: CÓDIGO DO SEU GÊNIO FINANCEIRO ---
 
 import asyncio
+import os # Importar o módulo os para acessar variáveis de ambiente
+from dotenv import load_dotenv # Importar para carregar .env localmente
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 import nest_asyncio
 import re
 
-# Permite executar loops asyncio aninhados no Colab
+# Permite executar loops asyncio aninhados (útil no Colab)
 nest_asyncio.apply()
 
-# SEU TOKEN DO BOTFATHER AQUI
-TOKEN = 'SEU_TOKEN_DO_BOTFATHER_AQUI'
+# Carrega as variáveis de ambiente do arquivo .env (se existir).
+# Isso é para uso LOCAL. No Render.com, as variáveis são injetadas diretamente.
+load_dotenv()
+
+# TOKEN do Telegram Bot. É lido de uma variável de ambiente.
+# Certifique-se de que o nome da variável de ambiente no Render.com (ex: TELEGRAM_BOT_TOKEN ou TOKEN)
+# corresponde ao nome que você está usando aqui.
+TOKEN = os.getenv('TELEGRAM_BOT_TOKEN') # Use 'TOKEN' se esse for o nome que você usou no Render
+
+# Token da API do Google Gemini (se você for usar o Gemini no seu bot).
+# Certifique-se de que esta variável de ambiente também está configurada no Render.com.
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') 
 
 # --- FUNÇÃO AUXILIAR PARA CRIAR O TECLADO DE COMANDOS ---
 def get_main_keyboard():
@@ -102,8 +119,6 @@ async def coletar_renda_principal(update: Update, context: ContextTypes.DEFAULT_
         context.chat_data['state'] = 'awaiting_first_expense' 
 
     else:
-        # Se chegou aqui de forma inesperada durante o coletar_renda_principal, volta para o início.
-        # No cenário de retomar conversa, isso não deveria acontecer se o estado for 'idle' ou None.
         await update.message.reply_text("Hmm, parece que pulamos uma etapa ou eu me perdi. Qual seu nome para eu te dar as boas-vindas novamente?", reply_markup=get_main_keyboard())
         context.chat_data['state'] = 'awaiting_name' 
 
@@ -184,13 +199,11 @@ async def coletar_gasto(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.chat_data['state'] = 'collecting_expenses' 
 
     else:
-        # Se chegou aqui de forma inesperada durante o coletar_gasto, volta para o início ou estado ocioso.
-        # No cenário de retomar conversa, isso não deveria acontecer se o estado for 'idle' ou None.
         await update.message.reply_text("Hmm, o Gênio está um pouco confuso. Qual seu nome para eu te dar as boas-vindas novamente?", reply_markup=get_main_keyboard())
         context.chat_data['state'] = 'awaiting_name' 
 
 async def resumo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    nome = context.user_data.get('nome_personalizado', 'Mestre') # Pega o nome personalizado
+    nome = context.user_data.get('nome_personalizado', 'Mestre') 
     renda = context.user_data.get('renda_principal_valor') 
     gastos = context.user_data.get('gastos', [])
     
@@ -259,7 +272,6 @@ async def processar_nova_renda(update: Update, context: ContextTypes.DEFAULT_TYP
         context.chat_data['state'] = 'collecting_expenses'
         await update.message.reply_text("Escolha uma opção:", reply_markup=get_main_keyboard()) 
     else:
-        # Se chegou aqui de forma inesperada, volta para o início ou estado ocioso.
         await update.message.reply_text("Hmm, o Gênio está um pouco confuso. Qual seu nome para eu te dar as boas-vindas novamente?", reply_markup=get_main_keyboard())
         context.chat_data['state'] = 'awaiting_name'
 
@@ -308,7 +320,6 @@ async def processar_indice_gasto_alteracao(update: Update, context: ContextTypes
                 reply_markup=ReplyKeyboardRemove() 
             )
     else:
-        # Se chegou aqui de forma inesperada, volta para o início ou estado ocioso.
         await update.message.reply_text("Hmm, o Gênio está um pouco confuso. Qual seu nome para eu te dar as boas-vindas novamente?", reply_markup=get_main_keyboard())
         context.chat_data['state'] = 'awaiting_name'
 
@@ -356,7 +367,6 @@ async def processar_novo_valor_gasto(update: Update, context: ContextTypes.DEFAU
         context.chat_data['state'] = 'collecting_expenses'
         await update.message.reply_text("Escolha uma opção:", reply_markup=get_main_keyboard()) 
     else:
-        # Se chegou aqui de forma inesperada, volta para o início ou estado ocioso.
         await update.message.reply_text("Hmm, o Gênio está um pouco confuso. Qual seu nome para eu te dar as boas-vindas novamente?", reply_markup=get_main_keyboard())
         context.chat_data['state'] = 'awaiting_name'
 
@@ -371,7 +381,7 @@ async def handle_negative_response(update: Update, context: ContextTypes.DEFAULT
                 f"Ok, investidor {nome_personalizado}! Se precisar de algo, é só dizer 'Oi' ou usar os comandos. 😉",
                 reply_markup=get_main_keyboard()
             )
-            context.chat_data['state'] = 'idle' # Define o estado como 'idle' em vez de None
+            context.chat_data['state'] = 'idle' 
             return True
     return False
 
@@ -395,7 +405,7 @@ async def handle_general_message(update: Update, context: ContextTypes.DEFAULT_T
         await processar_indice_gasto_alteracao(update, context)
     elif state == 'awaiting_new_expense_value_for_alteration':
         await processar_novo_valor_gasto(update, context)
-    elif state == 'idle' or state is None: # Se o estado for 'idle' ou 'None' (estado inicial/resetado)
+    elif state == 'idle' or state is None: 
         nome_personalizado = context.user_data.get('nome_personalizado')
         
         if update.message.text and update.message.text.lower() == 'oi':
@@ -404,11 +414,10 @@ async def handle_general_message(update: Update, context: ContextTypes.DEFAULT_T
                     f"Oi, {nome_personalizado}! Quais das opções você deseja? ✨",
                     reply_markup=get_main_keyboard()
                 )
-                context.chat_data['state'] = 'idle' # Mantém no estado ocioso
+                context.chat_data['state'] = 'idle' 
             else:
-                # Se disse 'Oi' mas não tem nome salvo, inicia o fluxo de start
                 await start(update, context)
-        else: # Mensagem não reconhecida em estado ocioso
+        else: 
             if nome_personalizado:
                 await update.message.reply_text(
                     f"Olá, {nome_personalizado}! Não entendi o que você disse. 😕\n"
@@ -423,19 +432,25 @@ async def handle_general_message(update: Update, context: ContextTypes.DEFAULT_T
                     "ou diga 'Oi' para recomeçar! ✨",
                     reply_markup=get_main_keyboard() 
                 )
-            context.chat_data['state'] = 'idle' # Garante que o estado seja 'idle' se não for um comando
+            context.chat_data['state'] = 'idle' 
     else: # Catch-all para estados não tratados explicitamente
         await update.message.reply_text(
             f"Desculpe, {context.user_data.get('nome_personalizado', 'Mestre')}, parece que estou em um estado inesperado. 😅\n"
             "Por favor, use os botões abaixo ou digite /start ou /recomecar para reiniciar nossa magia!",
             reply_markup=get_main_keyboard()
         )
-        context.chat_data['state'] = 'idle' # Volta para um estado seguro
+        context.chat_data['state'] = 'idle' 
 
 
 async def main():
     print("🚀 Iniciando o Bot do Gênio Financeiro...")
     
+    # Verifica se o token do Telegram foi carregado
+    if TOKEN is None:
+        print("❌ ERRO: O TOKEN do Telegram (TELEGRAM_BOT_TOKEN) não foi encontrado nas variáveis de ambiente.")
+        print("Certifique-se de que ele está definido no Render.com ou em um arquivo .env local.")
+        return # Interrompe a execução se o token não estiver disponível
+
     application = Application.builder().token(TOKEN).build()
     
     application.add_handler(CommandHandler("start", start))
@@ -467,12 +482,5 @@ async def main():
         print("👋 Bot parado com sucesso!")
 
 if __name__ == '__main__':
-    if TOKEN == 'SEU_TOKEN_DO_BOTFATHER_AQUI':
-        print("❌ ERRO: Você precisa substituir 'SEU_TOKEN_DO_BOTFATHER_AQUI' pelo seu token real do BotFather!")
-        print("📱 Como obter o token:")
-        print("1. Abra o Telegram e procure por @BotFather")
-        print("2. Digite /newbot e siga as instruções")
-        print("3. Copie o token que ele te der e cole na variável TOKEN")
-    else:
-        asyncio.run(main())
+    asyncio.run(main())
 
